@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PuckWars Arena</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background-color: #1a1a2e;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+        canvas {
+            background-color: #0f0f1b;
+            cursor: crosshair;
+            border-radius: 1rem;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5), inset 0 0 15px rgba(255, 255, 255, 0.2);
+            border: 2px solid #00ffff;
+        }
+        .health-bar-container {
+            width: 100%;
+            background-color: #2c2c54;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #474787;
+        }
+        .health-bar {
+            height: 20px;
+            background: linear-gradient(90deg, #ff4757, #ff6b81);
+            transition: width 0.5s ease-in-out;
+            border-radius: 8px 0 0 8px;
+        }
+        .control-panel {
+            background-color: rgba(15, 15, 27, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            border: 1px solid #00ffff;
+        }
+        .neon-button {
+            background-color: #1e90ff;
+            color: white;
+            border: 2px solid #1e90ff;
+            box-shadow: 0 0 5px #1e90ff, 0 0 10px #1e90ff, 0 0 15px #1e90ff;
+            transition: all 0.3s;
+        }
+        .neon-button:hover:not(:disabled) {
+            background-color: #4ca1ff;
+            box-shadow: 0 0 10px #4ca1ff, 0 0 20px #4ca1ff, 0 0 30px #4ca1ff;
+        }
+        .neon-button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+            box-shadow: none;
+        }
+        #winnerModal {
+            background-color: rgba(15, 15, 27, 0.9);
+            backdrop-filter: blur(10px);
+        }
+        .team-name-input {
+            background-color: transparent;
+            border: none;
+            outline: none;
+            color: inherit;
+            font-size: inherit;
+            font-weight: inherit;
+            padding: 2px 5px;
+            border-radius: 5px;
+            width: 100%;
+            transition: all 0.2s;
+        }
+        .team-name-input:focus {
+             box-shadow: 0 0 10px rgba(0, 255, 255, 0.7);
+             background-color: rgba(0, 255, 255, 0.1);
+        }
+        .team-name-input:read-only {
+            cursor: default;
+        }
+        .team-name-input.red-team { text-align: left; }
+        .team-name-input.blue-team { text-align: right; }
+        #winnerImage {
+            max-width: 150px;
+            max-height: 150px;
+            border-radius: 50%;
+            border: 4px solid #00ffff;
+            box-shadow: 0 0 20px #00ffff;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center h-screen p-4">
+
+    <!-- Oyun Başlığı ve Skor Tablosu -->
+    <div class="w-full max-w-4xl mb-4">
+        <h1 class="text-4xl font-bold text-center text-cyan-300 tracking-widest mb-4" style="text-shadow: 0 0 10px #00ffff;">PUCKWARS ARENA</h1>
+        <div class="flex justify-between items-center gap-4">
+            <!-- Oyuncu 1 Skor -->
+            <div class="flex-1">
+                 <input type="text" id="redTeamName" value="KIRMIZI TAKIM" class="team-name-input red-team text-xl text-red-400 mb-1">
+                <div class="health-bar-container">
+                    <div id="health1" class="health-bar"></div>
+                </div>
+            </div>
+            <!-- Oyuncu 2 Skor -->
+            <div class="flex-1">
+                 <input type="text" id="blueTeamName" value="MAVİ TAKIM" class="team-name-input blue-team text-xl text-blue-400 mb-1">
+                <div class="health-bar-container flex justify-end">
+                    <div id="health2" class="health-bar" style="background: linear-gradient(90deg, #1e90ff, #4ca1ff); border-radius: 0 8px 8px 0;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Oyun Alanı -->
+    <canvas id="gameCanvas" width="665" height="665"></canvas>
+
+    <!-- Kontrol Paneli -->
+    <div class="control-panel w-full max-w-4xl mt-4 p-4 grid grid-cols-3 items-center gap-4">
+        <!-- Kırmızı Takım Kontrolleri -->
+        <div class="flex flex-col items-center gap-2">
+            <label for="puck1Image" class="neon-button text-sm py-1 px-3 rounded-md cursor-pointer">Kırmızı Görsel</label>
+            <input type="file" id="puck1Image" accept="image/*" class="hidden">
+        </div>
+
+        <!-- Orta Butonlar -->
+        <div class="text-center">
+            <button id="startButton" class="neon-button font-bold py-2 px-6 rounded-lg text-lg">
+                Oyunu Başlat
+            </button>
+             <button id="resetButton" class="neon-button font-bold py-2 px-6 rounded-lg text-lg hidden">
+                Yeniden Başlat
+            </button>
+        </div>
+
+        <!-- Mavi Takım Kontrolleri -->
+        <div class="flex flex-col items-center gap-2">
+             <label for="puck2Image" class="neon-button text-sm py-1 px-3 rounded-md cursor-pointer">Mavi Görsel</label>
+            <input type="file" id="puck2Image" accept="image/*" class="hidden">
+        </div>
+    </div>
+
+
+    <!-- Kazanan Modalı -->
+    <div id="winnerModal" class="hidden fixed inset-0 items-center justify-center">
+        <div class="text-center p-8 rounded-lg border-2 border-cyan-300 shadow-2xl flex flex-col items-center gap-6">
+            <img id="winnerImage" src="" alt="Kazanan Takım Logosu" class="hidden">
+            <h2 id="winnerText" class="text-5xl font-bold" style="text-shadow: 0 0 15px #00ffff;"></h2>
+            <button id="playAgainButton" class="neon-button font-bold py-3 px-8 rounded-lg text-xl">
+                Tekrar Oyna
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Kontrol Elementleri
+        const startButton = document.getElementById('startButton');
+        const resetButton = document.getElementById('resetButton');
+        const playAgainButton = document.getElementById('playAgainButton');
+        const redTeamNameInput = document.getElementById('redTeamName');
+        const blueTeamNameInput = document.getElementById('blueTeamName');
+        const puck1ImageInput = document.getElementById('puck1Image');
+        const puck2ImageInput = document.getElementById('puck2Image');
+        
+        // Oyun Ayarları
+        const INITIAL_SPEED = 5.415;
+        const TEAM_MAX_HEALTH = 5;
+        const PUCK_RADIUS = 30;
+        const POWERUP_RADIUS = 15;
+        const POWERUP_SPAWN_RATE = 3000;
+        const POWERUP_LIFESPAN = 8000;
+
+        let pucks = [];
+        let powerups = [];
+        let gameOver = false;
+        let powerupSpawnTimer;
+        let animationFrameId;
+        let redTeamHealth;
+        let blueTeamHealth;
+        
+        let teamImages = {
+            red: null,
+            blue: null
+        };
+
+        class Puck {
+            constructor(x, y, color, team) {
+                this.team = team;
+                this.x = x; this.y = y;
+                const angle = Math.random() * Math.PI * 2;
+                this.vx = Math.cos(angle) * INITIAL_SPEED;
+                this.vy = Math.sin(angle) * INITIAL_SPEED;
+                this.radius = PUCK_RADIUS; this.color = color;
+                this.image = teamImages[team]; this.hasSaw = false;
+            }
+            draw() {
+                ctx.save();
+                if (this.hasSaw) {
+                    const numSpikes = 12, spikeLength = 10;
+                    ctx.fillStyle = 'yellow'; ctx.shadowBlur = 10; ctx.shadowColor = "yellow";
+                    for (let i = 0; i < numSpikes; i++) {
+                        const angle = (i / numSpikes) * Math.PI * 2, startAngle = angle - 0.1, endAngle = angle + 0.1;
+                        const tipX = this.x + (this.radius + spikeLength) * Math.cos(angle), tipY = this.y + (this.radius + spikeLength) * Math.sin(angle);
+                        const startX = this.x + this.radius * Math.cos(startAngle), startY = this.y + this.radius * Math.sin(startAngle);
+                        const endX = this.x + this.radius * Math.cos(endAngle), endY = this.y + this.radius * Math.sin(endAngle);
+                        ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(tipX, tipY); ctx.lineTo(endX, endY); ctx.closePath(); ctx.fill();
+                    }
+                    ctx.shadowBlur = 0;
+                }
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                if (this.image && this.image.complete) { ctx.clip(); ctx.drawImage(this.image, this.x - this.radius, this.y - this.radius, this.radius * 2, this.radius * 2); } 
+                else { ctx.fillStyle = this.color; ctx.fill(); }
+                ctx.restore();
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                this.checkWallCollision();
+            }
+            checkWallCollision() {
+                if (this.x - this.radius < 0 || this.x + this.radius > canvas.width) { this.x = (this.x - this.radius < 0) ? this.radius : canvas.width - this.radius; this.vx *= -1; }
+                if (this.y - this.radius < 0 || this.y + this.radius > canvas.height) { this.y = (this.y - this.radius < 0) ? this.radius : canvas.height - this.radius; this.vy *= -1; }
+            }
+        }
+
+        class Powerup {
+            constructor(x, y, type) { this.x = x; this.y = y; this.type = type; this.radius = POWERUP_RADIUS; this.createdAt = Date.now(); }
+            draw() {
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.font = '20px Orbitron';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; let symbol = '⚙️', color = 'yellow';
+                ctx.fillStyle = `rgba(255, 255, 255, 0.2)`; ctx.fill(); ctx.shadowBlur = 10;
+                ctx.shadowColor = color; ctx.fillText(symbol, this.x, this.y); ctx.shadowBlur = 0;
+            }
+        }
+
+        function drawScene() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            powerups.forEach(p => p.draw());
+            pucks.forEach(p => p.draw());
+        }
+
+        function init() {
+            if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+            gameOver = false;
+            document.getElementById('winnerModal').classList.add('hidden');
+            document.getElementById('winnerImage').classList.add('hidden');
+            redTeamNameInput.value = "KIRMIZI TAKIM";
+            blueTeamNameInput.value = "MAVİ TAKIM";
+            redTeamHealth = TEAM_MAX_HEALTH;
+            blueTeamHealth = TEAM_MAX_HEALTH;
+            pucks = [];
+            for (let i = 0; i < 3; i++) {
+                const yPos = (canvas.height / 4) * (i + 1);
+                pucks.push(new Puck(canvas.width * 0.2, yPos, '#ff4757', 'red'));
+                pucks.push(new Puck(canvas.width * 0.8, yPos, '#1e90ff', 'blue'));
+            }
+            powerups = []; updateHealthUI();
+            clearInterval(powerupSpawnTimer);
+
+            // Enable controls
+            redTeamNameInput.readOnly = false; blueTeamNameInput.readOnly = false;
+            puck1ImageInput.disabled = false; puck2ImageInput.disabled = false;
+            startButton.classList.remove('hidden'); resetButton.classList.add('hidden');
+
+            drawScene();
+        }
+
+        function startGame() {
+            if (animationFrameId) return;
+            // Disable controls
+            redTeamNameInput.readOnly = true; blueTeamNameInput.readOnly = true;
+            puck1ImageInput.disabled = true; puck2ImageInput.disabled = true;
+            startButton.classList.add('hidden'); resetButton.classList.remove('hidden');
+            
+            powerupSpawnTimer = setInterval(spawnPowerup, POWERUP_SPAWN_RATE);
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function spawnPowerup() {
+            if (powerups.length >= 3 || gameOver) return;
+            const x = Math.random() * (canvas.width - 200) + 100;
+            const y = Math.random() * (canvas.height - 200) + 100;
+            powerups.push(new Powerup(x, y, 'saw'));
+        }
+
+        function checkCollisions() {
+            for (let i = 0; i < pucks.length; i++) {
+                for (let j = i + 1; j < pucks.length; j++) {
+                    const p1 = pucks[i], p2 = pucks[j];
+                    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < p1.radius + p2.radius) {
+                        let damaged = false;
+                        if (p1.team !== p2.team) {
+                            if (p1.hasSaw) {
+                                if (p2.team === 'red') redTeamHealth = Math.max(0, redTeamHealth - 1); else blueTeamHealth = Math.max(0, blueTeamHealth - 1);
+                                p1.hasSaw = false; damaged = true;
+                            }
+                            if (p2.hasSaw) {
+                                if (p1.team === 'red') redTeamHealth = Math.max(0, redTeamHealth - 1); else blueTeamHealth = Math.max(0, blueTeamHealth - 1);
+                                p2.hasSaw = false; damaged = true;
+                            }
+                        }
+                        const angle = Math.atan2(dy, dx), sin = Math.sin(angle), cos = Math.cos(angle);
+                        const vx1 = p1.vx * cos + p1.vy * sin, vy1 = p1.vy * cos - p1.vx * sin;
+                        const vx2 = p2.vx * cos + p2.vy * sin, vy2 = p2.vy * cos - p2.vx * sin;
+                        const finalVx1 = ((p1.radius - p2.radius) * vx1 + (p2.radius + p2.radius) * vx2) / (p1.radius + p2.radius);
+                        const finalVx2 = ((p1.radius + p1.radius) * vx1 + (p2.radius - p1.radius) * vx2) / (p1.radius + p2.radius);
+                        const overlap = p1.radius + p2.radius - distance;
+                        p1.x -= (overlap / 2) * cos; p1.y -= (overlap / 2) * sin;
+                        p2.x += (overlap / 2) * cos; p2.y += (overlap / 2) * sin;
+                        p1.vx = cos * finalVx1 - sin * vy1; p1.vy = sin * finalVx1 + cos * vy1;
+                        p2.vx = cos * finalVx2 - sin * vy2; p2.vy = sin * finalVx2 + cos * vy2;
+                        const speed1 = Math.sqrt(p1.vx * p1.vx + p1.vy * p1.vy);
+                        if (speed1 > 0) { p1.vx = (p1.vx / speed1) * INITIAL_SPEED; p1.vy = (p1.vy / speed1) * INITIAL_SPEED; }
+                        const speed2 = Math.sqrt(p2.vx * p2.vx + p2.vy * p2.vy);
+                        if (speed2 > 0) { p2.vx = (p2.vx / speed2) * INITIAL_SPEED; p2.vy = (p2.vy / speed2) * INITIAL_SPEED; }
+                        if(damaged) { updateHealthUI(); checkGameOver(); }
+                    }
+                }
+            }
+        }
+        
+        function checkPowerupCollisions() {
+            pucks.forEach(puck => {
+                powerups.forEach((powerup, index) => {
+                    const dx = powerup.x - puck.x, dy = powerup.y - puck.y, distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < puck.radius + powerup.radius) { puck.hasSaw = true; powerups.splice(index, 1); }
+                });
+            });
+        }
+        
+        function updateHealthUI() {
+            document.getElementById('health1').style.width = `${Math.max(0, (redTeamHealth / TEAM_MAX_HEALTH) * 100)}%`;
+            document.getElementById('health2').style.width = `${Math.max(0, (blueTeamHealth / TEAM_MAX_HEALTH) * 100)}%`;
+        }
+        
+        function checkGameOver() {
+            if (gameOver) return;
+            let winner = null;
+            if (redTeamHealth <= 0) winner = 'Mavi Takım';
+            else if (blueTeamHealth <= 0) winner = 'Kırmızı Takım';
+            if (winner) {
+                gameOver = true;
+                clearInterval(powerupSpawnTimer);
+                const winnerTextElement = document.getElementById('winnerText');
+                const winnerModal = document.getElementById('winnerModal');
+                const winnerImageElement = document.getElementById('winnerImage');
+                
+                const winningTeamName = winner === 'Kırmızı Takım' ? redTeamNameInput.value : blueTeamNameInput.value;
+                const winningTeamImage = winner === 'Kırmızı Takım' ? teamImages.red : teamImages.blue;
+
+                winnerTextElement.textContent = `${winningTeamName} Kazandı!`;
+
+                if (winningTeamImage) {
+                    winnerImageElement.src = winningTeamImage.src;
+                    winnerImageElement.classList.remove('hidden');
+                }
+
+                winnerModal.classList.remove('hidden'); winnerModal.classList.add('flex');
+            }
+        }
+
+        function gameLoop() {
+            if (gameOver) { animationFrameId = null; return; }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            powerups = powerups.filter(p => Date.now() - p.createdAt < POWERUP_LIFESPAN);
+            powerups.forEach(p => p.draw());
+            pucks.forEach(p => { p.update(); p.draw(); });
+            checkCollisions(); checkPowerupCollisions();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+        
+        function handleImageUpload(event, team) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        teamImages[team] = img;
+                        pucks.forEach(puck => { if (puck.team === team) puck.image = img; });
+                        drawScene();
+                    }
+                    img.src = e.target.result;
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        puck1ImageInput.addEventListener('change', (e) => handleImageUpload(e, 'red'));
+        puck2ImageInput.addEventListener('change', (e) => handleImageUpload(e, 'blue'));
+        startButton.addEventListener('click', startGame);
+        resetButton.addEventListener('click', init);
+        playAgainButton.addEventListener('click', init);
+        
+        init();
+    </script>
+</body>
+</html>
+
